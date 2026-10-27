@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON BREAKOUT - 經典打磚塊</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            touch-action: none; /* 防止手機滑動拖拽導致頁面滾動 */
+            user-select: none;
+        }
+        
+        /* 霓虹特效燈光與陰影 */
+        .neon-text-blue {
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.6), 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+        .neon-box-blue {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5), inset 0 0 10px rgba(59, 130, 246, 0.3);
+        }
+        .neon-button {
+            transition: all 0.2s ease;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+        }
+        .neon-button:hover {
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.8);
+            transform: translateY(-2px);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(229, 231, 235, 0.8);
+        }
+        canvas {
+            display: block;
+            border-radius: 1rem;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-800 min-h-screen flex flex-col justify-between items-center p-2 sm:p-4 overflow-x-hidden select-none">
+
+    <!-- 頂部頁首與標題區域 -->
+    <header class="w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center mb-3 px-4 py-2 bg-slate-800/80 rounded-2xl border border-slate-700 text-white shadow-lg backdrop-blur-md">
+        <div class="flex items-center gap-3 mb-2 sm:mb-0">
+            <div class="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-500/30">
+                <i class="fa-solid font-bold text-xl text-white fa-cubes"></i>
+            </div>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent">
+                    NEON BREAKOUT
+                </h1>
+                <p class="text-xs text-slate-400 font-medium tracking-wide">Classic Arcade Edition</p>
+            </div>
+        </div>
+
+        <!-- 計分板 (Score, Lives, Level, High Score) -->
+        <div class="grid grid-cols-4 gap-2 sm:gap-4 text-center w-full sm:w-auto">
+            <div class="bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
+                <div class="text-[10px] sm:text-xs text-slate-400 font-bold uppercase">Score</div>
+                <div id="scoreDisplay" class="text-sm sm:text-base font-extrabold text-blue-400">0</div>
+            </div>
+            <div class="bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
+                <div class="text-[10px] sm:text-xs text-slate-400 font-bold uppercase">Lives</div>
+                <div id="livesDisplay" class="text-sm sm:text-base font-extrabold text-pink-500 flex justify-center items-center gap-1">
+                    3
+                </div>
+            </div>
+            <div class="bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
+                <div class="text-[10px] sm:text-xs text-slate-400 font-bold uppercase">Level</div>
+                <div id="levelDisplay" class="text-sm sm:text-base font-extrabold text-amber-400">1</div>
+            </div>
+            <div class="bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
+                <div class="text-[10px] sm:text-xs text-slate-400 font-bold uppercase">High Score</div>
+                <div id="highScoreDisplay" class="text-sm sm:text-base font-extrabold text-emerald-400">0</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主控制按鈕列 (Pause, Restart, Rules) -->
+    <div class="w-full max-w-4xl flex justify-between items-center mb-2 px-2">
+        <div class="flex gap-2">
+            <button id="pauseBtn" class="bg-slate-800 hover:bg-slate-700 text-white text-xs sm:text-sm font-semibold px-3.5 py-1.5 rounded-xl border border-slate-700 transition flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-pause"></i> 暫停遊戲
+            </button>
+            <button id="restartBtn" class="bg-slate-800 hover:bg-slate-700 text-white text-xs sm:text-sm font-semibold px-3.5 py-1.5 rounded-xl border border-slate-700 transition flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-rotate-right"></i> 重新開始
+            </button>
+        </div>
+        <button id="helpBtn" class="bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-xl border border-indigo-500/40 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-question"></i> 遊戲說明
+        </button>
+    </div>
+
+    <!-- Canvas 遊戲畫布區域 -->
+    <main class="relative w-full max-w-4xl aspect-[4/3] max-h-[70vh] flex justify-center items-center bg-white rounded-2xl shadow-2xl overflow-hidden border-4 border-slate-800">
+        <canvas id="gameCanvas" class="w-full h-full cursor-none"></canvas>
+
+        <!-- 畫面上方狀態告示浮水印 (例如：暫停中) -->
+        <div id="pauseOverlay" class="hidden absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col justify-center items-center text-white z-20">
+            <i class="fa-solid fa-circle-pause text-6xl text-blue-400 mb-3 animate-pulse"></i>
+            <h2 class="text-2xl font-bold tracking-wide">遊戲暫停中</h2>
+            <p class="text-sm text-slate-300 mt-1">按下 Resume 或空白鍵繼續遊戲</p>
+            <button id="resumeBtn" class="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition">
+                繼續遊戲
+            </button>
+        </div>
+    </main>
+
+    <!-- 底部網頁 Footer -->
+    <footer class="w-full max-w-4xl text-center py-3 text-xs text-slate-500 font-medium mt-auto">
+        2026 Neon Breakout Arcade. Powered by HTML5 Canvas & Tailwind CSS.
+    </footer>
+
+    <!-- 1. 開始遊戲彈窗 (Start Modal) -->
+    <div id="startModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center p-4 z-50">
+        <div class="glass-panel max-w-md w-full p-6 sm:p-8 rounded-3xl shadow-2xl text-center border border-white/60 relative">
+            <div class="w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl mx-auto flex justify-center items-center text-white text-3xl shadow-lg shadow-blue-500/40 mb-4">
+                <i class="fa-solid fa-gamepad"></i>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-1">NEON BREAKOUT</h2>
+            <p class="text-xs font-bold text-blue-600 uppercase tracking-widest mb-4">Classic Arcade Edition</p>
+            <p class="text-slate-600 text-sm leading-relaxed mb-6">
+                摧毀所有磚塊，收集強力道具，挑戰最高得分！<br>支援鍵盤、滑鼠與觸控操作。
+            </p>
+            <button id="startGameBtn" class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-base rounded-2xl shadow-lg shadow-blue-500/40 hover:from-blue-500 hover:to-indigo-500 transform hover:-translate-y-0.5 transition active:translate-y-0">
+                開始遊戲 (START GAME)
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. 遊戲結束彈窗 (Game Over Modal) -->
+    <div id="gameOverModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md flex justify-center items-center p-4 z-50">
+        <div class="glass-panel max-w-md w-full p-6 sm:p-8 rounded-3xl shadow-2xl text-center border border-pink-200">
+            <div class="w-16 h-16 bg-gradient-to-tr from-rose-500 to-pink-500 rounded-2xl mx-auto flex justify-center items-center text-white text-3xl shadow-lg shadow-rose-500/40 mb-4">
+                <i class="fa-solid fa-heart-crack"></i>
+            </div>
+            <h2 class="text-3xl font-black text-slate-900 mb-1">遊戲結束</h2>
+            <p class="text-slate-500 text-sm mb-6">再接再厲！發揮你的實力挑戰更高分。</p>
+            
+            <div class="bg-slate-100/80 rounded-2xl p-4 mb-6 grid grid-cols-2 gap-4 border border-slate-200">
+                <div>
+                    <span class="text-xs text-slate-500 font-bold block">最終得分</span>
+                    <span id="finalScore" class="text-2xl font-black text-blue-600">0</span>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-500 font-bold block">最高紀錄</span>
+                    <span id="finalHighScore" class="text-2xl font-black text-emerald-600">0</span>
+                </div>
+            </div>
+
+            <button id="restartGameBtn" class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-base rounded-2xl shadow-lg shadow-blue-500/40 hover:from-blue-500 hover:to-indigo-500 transition">
+                再次挑戰
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. 關卡完成彈窗 (Level Clear Modal) -->
+    <div id="levelClearModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center p-4 z-50">
+        <div class="glass-panel max-w-md w-full p-6 sm:p-8 rounded-3xl shadow-2xl text-center border border-emerald-200">
+            <div class="w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl mx-auto flex justify-center items-center text-white text-3xl shadow-lg shadow-emerald-500/40 mb-4 animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h2 class="text-3xl font-black text-slate-900 mb-1">關卡完成！</h2>
+            <p class="text-slate-600 text-sm mb-6">太神啦！你成功清理了所有磚塊！</p>
+            
+            <button id="nextLevelBtn" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-base rounded-2xl shadow-lg shadow-emerald-500/40 hover:from-emerald-500 hover:to-teal-500 transition">
+                進入下一關
+            </button>
+        </div>
+    </div>
+
+    <!-- 4. 遊戲說明 modal (Help Rules Modal) -->
+    <div id="helpModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center p-4 z-50">
+        <div class="glass-panel max-w-lg w-full p-6 rounded-3xl shadow-2xl border border-white/60 text-slate-700">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-200">
+                <h3 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-blue-600"></i> 遊戲說明與規則
+                </h3>
+                <button id="closeHelpBtn" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-3 text-sm leading-relaxed overflow-y-auto max-h-[60vh] pr-1">
+                <p class="flex items-start gap-2">
+                    <i class="fa-solid fa-gamepad text-blue-500 mt-1"></i>
+                    <span><strong>移動滑板：</strong>使用滑鼠指標、觸控拖曳或鍵盤方向鍵 (<code class="bg-slate-200 px-1 rounded">←</code> <code class="bg-slate-200 px-1 rounded">→</code> 或 <code class="bg-slate-200 px-1 rounded">A</code> / <code class="bg-slate-200 px-1 rounded">D</code>) 移動底部滑板。</span>
+                </p>
+                <p class="flex items-start gap-2">
+                    <i class="fa-solid fa-arrows-spin text-indigo-500 mt-1"></i>
+                    <span><strong>反彈角度：</strong>球打在滑板的不同位置會改變反彈角度（靠近邊緣角度更大）。</span>
+                </p>
+                
+                <div class="bg-blue-50/80 p-3 rounded-xl border border-blue-100">
+                    <span class="font-bold text-blue-900 block mb-2"><i class="fa-solid fa-gift text-blue-600"></i> 隨機道具（擊碎特定磚塊掉落）：</span>
+                    <ul class="space-y-1.5 text-xs text-slate-600 pl-1">
+                        <li class="flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white flex justify-center items-center text-[10px] font-bold">W</span>
+                            <strong>寬板 (Expand):</strong> 延長滑板寬度。
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-amber-500 text-white flex justify-center items-center text-[10px] font-bold">M</span>
+                            <strong>多球 (Multi-Ball):</strong> 分裂出額外的小球。
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-rose-500 text-white flex justify-center items-center text-[10px] font-bold">L</span>
+                            <strong>加命 (Life+):</strong> 增加 1 點生命值。
+                        </li>
+                    </ul>
+                </div>
+
+                <p class="flex items-start gap-2">
+                    <i class="fa-solid fa-flag-checkered text-emerald-500 mt-1"></i>
+                    <span><strong>過關條件：</strong>清除畫面上所有磚塊即可晉級下一關，隨著關卡提升，球速會加快。</span>
+                </p>
+            </div>
+
+            <button id="understandHelpBtn" class="mt-5 w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition">
+                了解，關閉視窗
+            </button>
+        </div>
+    </div>
+
+    <!-- 遊戲主要邏輯 JavaScript -->
+    <script>
+        // --- 遊戲組態與全域變數 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 設計解析度（固定邏輯座標軸寬高）
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        // 磚塊設定 (5列, 8行)
+        const BRICK_ROWS = 5;
+        const BRICK_COLS = 8;
+        const BRICK_PADDING = 12;
+        const BRICK_OFFSET_TOP = 60;
+        const BRICK_OFFSET_LEFT = 35;
+        const BRICK_WIDTH = 82;
+        const BRICK_HEIGHT = 28;
+
+        // 磚塊五種顏色 (對應畫面上由上至下的 5 行：粉紅、橘、黃、綠、藍)
+        const ROW_COLORS = [
+            { fill: '#ff85a2', stroke: '#ff4d79', name: 'pink' },
+            { fill: '#ffaa64', stroke: '#ff8833', name: 'orange' },
+            { fill: '#ffd15c', stroke: '#f5b025', name: 'yellow' },
+            { fill: '#5cdbb5', stroke: '#26c496', name: 'green' },
+            { fill: '#7ab8ff', stroke: '#4797ff', name: 'blue' }
+        ];
+
+        // 遊戲狀態
+        let gameState = 'START'; // 'START', 'PLAYING', 'PAUSED', 'GAMEOVER', 'LEVEL_CLEAR'
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        let highScore = parseInt(localStorage.getItem('neon_breakout_highscore')) || 0;
+
+        // 滑板屬性
+        const defaultPaddleWidth = 110;
+        const paddleHeight = 16;
+        let paddle = {
+            x: (CANVAS_WIDTH - defaultPaddleWidth) / 2,
+            y: CANVAS_HEIGHT - 35,
+            width: defaultPaddleWidth,
+            height: paddleHeight,
+            speed: 8,
+            dx: 0,
+            isExpanded: false,
+            expandTimer: null
+        };
+
+        // 球屬性陣列（支援多球機制）
+        let balls = [];
+
+        // 掉落道具陣列
+        let powerUps = [];
+
+        // 磚塊陣列
+        let bricks = [];
+
+        // 按鍵監聽狀態
+        const keys = {
+            left: false,
+            right: false
+        };
+
+        // --- 初始化與 DOM 綁定 ---
+        document.getElementById('highScoreDisplay').innerText = highScore;
+
+        // DOM 元素引用
+        const startModal = document.getElementById('startModal');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const levelClearModal = document.getElementById('levelClearModal');
+        const helpModal = document.getElementById('helpModal');
+        const pauseOverlay = document.getElementById('pauseOverlay');
+
+        const startGameBtn = document.getElementById('startGameBtn');
+        const restartGameBtn = document.getElementById('restartGameBtn');
+        const nextLevelBtn = document.getElementById('nextLevelBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const helpBtn = document.getElementById('helpBtn');
+        const closeHelpBtn = document.getElementById('closeHelpBtn');
+        const understandHelpBtn = document.getElementById('understandHelpBtn');
+
+        // 按鈕事件綁定
+        startGameBtn.addEventListener('click', startGame);
+        restartGameBtn.addEventListener('click', resetAndStartGame);
+        nextLevelBtn.addEventListener('click', startNextLevel);
+        pauseBtn.addEventListener('click', togglePause);
+        resumeBtn.addEventListener('click', togglePause);
+        restartBtn.addEventListener('click', resetAndStartGame);
+        helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+        closeHelpBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+        understandHelpBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+
+        // 鍵盤事件
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === ' ' || e.key === 'p' || e.key === 'P') {
+                if (gameState === 'PLAYING' || gameState === 'PAUSED') {
+                    togglePause();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+        });
+
+        // 滑鼠與觸控操作對齊
+        function setPaddlePosFromCanvasX(clientX) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = CANVAS_WIDTH / rect.width;
+            const mouseX = (clientX - rect.left) * scaleX;
+            paddle.x = mouseX - paddle.width / 2;
+            
+            // 邊界限制
+            if (paddle.x < 0) paddle.x = 0;
+            if (paddle.x + paddle.width > CANVAS_WIDTH) paddle.x = CANVAS_WIDTH - paddle.width;
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (gameState === 'PLAYING') {
+                setPaddlePosFromCanvasX(e.clientX);
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (gameState === 'PLAYING' && e.touches.length > 0) {
+                e.preventDefault();
+                setPaddlePosFromCanvasX(e.touches[0].clientX);
+            }
+        }, { passive: false });
+
+        // --- 遊戲邏輯與流程控制 ---
+
+        // 初始化磚塊矩陣
+        function initBricks() {
+            bricks = [];
+            for (let r = 0; r < BRICK_ROWS; r++) {
+                bricks[r] = [];
+                for (let c = 0; c < BRICK_COLS; c++) {
+                    // 隨機決定該磚塊是否帶有道具掉落 (約 25% 機率)
+                    let powerType = null;
+                    if (Math.random() < 0.25) {
+                        const rand = Math.random();
+                        if (rand < 0.45) powerType = 'EXPAND';  // 寬板
+                        else if (rand < 0.8) powerType = 'MULTI'; // 多球
+                        else powerType = 'LIFE';                 // 加命
+                    }
+
+                    bricks[r][c] = {
+                        x: BRICK_OFFSET_LEFT + c * (BRICK_WIDTH + BRICK_PADDING),
+                        y: BRICK_OFFSET_TOP + r * (BRICK_HEIGHT + BRICK_PADDING),
+                        status: 1, // 1: 存活, 0: 已毀壞
+                        color: ROW_COLORS[r % ROW_COLORS.length],
+                        powerType: powerType
+                    };
+                }
+            }
+        }
+
+        // 建立球體
+        function createBall(x, y, speedMult = 1) {
+            const baseSpeed = 5 + (level - 1) * 0.8;
+            const angle = (Math.random() * 0.6 - 0.3) - Math.PI / 2; // 微傾斜向上的初速
+            return {
+                x: x || CANVAS_WIDTH / 2,
+                y: y || paddle.y - 12,
+                radius: 8,
+                speed: baseSpeed * speedMult,
+                dx: baseSpeed * Math.sin(angle),
+                dy: -baseSpeed * Math.cos(angle)
+            };
+        }
+
+        // 開始新遊戲
+        function startGame() {
+            startModal.classList.add('hidden');
+            score = 0;
+            lives = 3;
+            level = 1;
+            updateHUD();
+            resetRound();
+            gameState = 'PLAYING';
+        }
+
+        // 重新開始遊戲
+        function resetAndStartGame() {
+            gameOverModal.classList.add('hidden');
+            levelClearModal.classList.add('hidden');
+            pauseOverlay.classList.add('hidden');
+            score = 0;
+            lives = 3;
+            level = 1;
+            updateHUD();
+            resetRound();
+            gameState = 'PLAYING';
+        }
+
+        // 開始下一關
+        function startNextLevel() {
+            levelClearModal.classList.add('hidden');
+            level++;
+            updateHUD();
+            resetRound();
+            gameState = 'PLAYING';
+        }
+
+        // 重置當前回合（重置板子、磚塊或球位置）
+        function resetRound() {
+            paddle.width = defaultPaddleWidth;
+            paddle.x = (CANVAS_WIDTH - defaultPaddleWidth) / 2;
+            paddle.isExpanded = false;
+            if (paddle.expandTimer) clearTimeout(paddle.expandTimer);
+
+            balls = [createBall()];
+            powerUps = [];
+            initBricks();
+        }
+
+        // 暫停切換
+        function togglePause() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                pauseOverlay.classList.remove('hidden');
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                pauseOverlay.classList.add('hidden');
+            }
+        }
+
+        // 更新介面數值
+        function updateHUD() {
+            document.getElementById('scoreDisplay').innerText = score;
+            document.getElementById('livesDisplay').innerText = lives;
+            document.getElementById('levelDisplay').innerText = level;
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('neon_breakout_highscore', highScore);
+                document.getElementById('highScoreDisplay').innerText = highScore;
+            }
+        }
+
+        // --- 繪製函式 ---
+
+        // 繪製背景格線 (比照圖像風格)
+        function drawGridBackground() {
+            // 背景底色
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // 灰色淺格線
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            const gridSize = 25;
+
+            for (let x = 0; x < CANVAS_WIDTH; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, CANVAS_HEIGHT);
+                ctx.stroke();
+            }
+
+            for (let y = 0; y < CANVAS_HEIGHT; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(CANVAS_WIDTH, y);
+                ctx.stroke();
+            }
+        }
+
+        // 繪製圓角矩形輔助函式
+        function drawRoundRect(x, y, width, height, radius, fillColor, strokeColor) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.arcTo(x + width, y, x + width, y + height, radius);
+            ctx.arcTo(x + width, y + height, x, y + height, radius);
+            ctx.arcTo(x, y + height, x, y, radius);
+            ctx.arcTo(x, y, x + width, y, radius);
+            ctx.closePath();
+
+            if (fillColor) {
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+            }
+            if (strokeColor) {
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        // 繪製磚塊
+        function drawBricks() {
+            for (let r = 0; r < BRICK_ROWS; r++) {
+                for (let c = 0; c < BRICK_COLS; c++) {
+                    const b = bricks[r][c];
+                    if (b.status === 1) {
+                        // 繪製圓角磚塊
+                        drawRoundRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT, 6, b.color.fill, b.color.stroke);
+
+                        // 磚塊內部光澤點綴
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                        ctx.beginPath();
+                        ctx.arc(b.x + BRICK_WIDTH - 8, b.y + 8, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        // 繪製滑板
+        function drawPaddle() {
+            // 滑板藍色外發光特效
+            ctx.save();
+            ctx.shadowColor = '#3b82f6';
+            ctx.shadowBlur = 12;
+
+            // 繪製滑板本體 (藍色膠囊狀)
+            drawRoundRect(paddle.x, paddle.y, paddle.width, paddle.height, paddle.height / 2, '#3b82f6', '#1d4ed8');
+
+            // 滑板高光線條
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fillRect(paddle.x + paddle.height / 2, paddle.y + 3, paddle.width - paddle.height, 3);
+
+            ctx.restore();
+        }
+
+        // 繪製球
+        function drawBalls() {
+            balls.forEach(ball => {
+                ctx.save();
+                ctx.shadowColor = '#3b82f6';
+                ctx.shadowBlur = 10;
+
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#60a5fa';
+                ctx.fill();
+                ctx.strokeStyle = '#2563eb';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.closePath();
+
+                // 光斑
+                ctx.beginPath();
+                ctx.arc(ball.x - 2, ball.y - 2, ball.radius * 0.3, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
+                ctx.restore();
+            });
+        }
+
+        // 繪製掉落道具
+        function drawPowerUps() {
+            powerUps.forEach(p => {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+
+                let color = '#3b82f6';
+                let label = 'W';
+                if (p.type === 'MULTI') { color = '#f59e0b'; label = 'M'; }
+                if (p.type === 'LIFE') { color = '#f43f5e'; label = 'L'; }
+
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 標籤文字
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 10px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, p.x, p.y);
+
+                ctx.restore();
+            });
+        }
+
+        // --- 物理更新與碰撞偵測 ---
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            // 1. 滑板鍵盤移動
+            if (keys.left) {
+                paddle.x -= paddle.speed;
+                if (paddle.x < 0) paddle.x = 0;
+            }
+            if (keys.right) {
+                paddle.x += paddle.speed;
+                if (paddle.x + paddle.width > CANVAS_WIDTH) paddle.x = CANVAS_WIDTH - paddle.width;
+            }
+
+            // 2. 更新球的位置與碰撞
+            for (let i = balls.length - 1; i >= 0; i--) {
+                let ball = balls[i];
+                ball.x += ball.dx;
+                ball.y += ball.dy;
+
+                // 左右邊界碰撞
+                if (ball.x - ball.radius < 0) {
+                    ball.x = ball.radius;
+                    ball.dx = -ball.dx;
+                } else if (ball.x + ball.radius > CANVAS_WIDTH) {
+                    ball.x = CANVAS_WIDTH - ball.radius;
+                    ball.dx = -ball.dx;
+                }
+
+                // 上邊界碰撞
+                if (ball.y - ball.radius < 0) {
+                    ball.y = ball.radius;
+                    ball.dy = -ball.dy;
+                }
+
+                // 滑板碰撞 (反彈角度取決於擊中滑板的位置)
+                if (
+                    ball.y + ball.radius >= paddle.y &&
+                    ball.y - ball.radius <= paddle.y + paddle.height &&
+                    ball.x + ball.radius >= paddle.x &&
+                    ball.x - ball.radius <= paddle.x + paddle.width &&
+                    ball.dy > 0
+                ) {
+                    // 計算擊中相對位置 (-1 至 1)
+                    let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+                    hitPoint = Math.max(-0.9, Math.min(0.9, hitPoint)); // 限制極端角度
+
+                    // 最大反彈角 60 度 (PI/3)
+                    let maxAngle = Math.PI / 3;
+                    let bounceAngle = hitPoint * maxAngle;
+
+                    let speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+                    ball.dx = speed * Math.sin(bounceAngle);
+                    ball.dy = -speed * Math.cos(bounceAngle);
+                }
+
+                // 磚塊碰撞偵測
+                let hitBrick = false;
+                for (let r = 0; r < BRICK_ROWS && !hitBrick; r++) {
+                    for (let c = 0; c < BRICK_COLS && !hitBrick; c++) {
+                        let b = bricks[r][c];
+                        if (b.status === 1) {
+                            if (
+                                ball.x + ball.radius > b.x &&
+                                ball.x - ball.radius < b.x + BRICK_WIDTH &&
+                                ball.y + ball.radius > b.y &&
+                                ball.y - ball.radius < b.y + BRICK_HEIGHT
+                            ) {
+                                b.status = 0;
+                                ball.dy = -ball.dy;
+                                score += 10;
+                                updateHUD();
+                                hitBrick = true;
+
+                                // 若有道具，產生掉落道具
+                                if (b.powerType) {
+                                    powerUps.push({
+                                        x: b.x + BRICK_WIDTH / 2,
+                                        y: b.y + BRICK_HEIGHT / 2,
+                                        radius: 11,
+                                        dy: 2.5,
+                                        type: b.powerType
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 球落入底部掉落判定
+                if (ball.y - ball.radius > CANVAS_HEIGHT) {
+                    balls.splice(i, 1);
+                }
+            }
+
+            // 若畫面上沒有球，扣減生命
+            if (balls.length === 0) {
+                lives--;
+                updateHUD();
+
+                if (lives <= 0) {
+                    gameState = 'GAMEOVER';
+                    document.getElementById('finalScore').innerText = score;
+                    document.getElementById('finalHighScore').innerText = highScore;
+                    gameOverModal.classList.remove('hidden');
+                } else {
+                    // 重置下一顆球
+                    balls.push(createBall());
+                }
+            }
+
+            // 3. 更新掉落道具狀態
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                let p = powerUps[i];
+                p.y += p.dy;
+
+                // 道具與滑板碰撞
+                if (
+                    p.y + p.radius >= paddle.y &&
+                    p.y - p.radius <= paddle.y + paddle.height &&
+                    p.x + p.radius >= paddle.x &&
+                    p.x - p.radius <= paddle.x + paddle.width
+                ) {
+                    // 觸發道具效果
+                    applyPowerUp(p.type);
+                    powerUps.splice(i, 1);
+                    continue;
+                }
+
+                // 超出邊界移除
+                if (p.y - p.radius > CANVAS_HEIGHT) {
+                    powerUps.splice(i, 1);
+                }
+            }
+
+            // 4. 檢查過關 (所有磚塊皆摧毀)
+            let remainingBricks = 0;
+            for (let r = 0; r < BRICK_ROWS; r++) {
+                for (let c = 0; c < BRICK_COLS; c++) {
+                    if (bricks[r][c].status === 1) remainingBricks++;
+                }
+            }
+
+            if (remainingBricks === 0) {
+                gameState = 'LEVEL_CLEAR';
+                levelClearModal.classList.remove('hidden');
+            }
+        }
+
+        // 應用道具效果
+        function applyPowerUp(type) {
+            score += 20; // 收集道具獲得獎勵分
+            updateHUD();
+
+            if (type === 'EXPAND') {
+                paddle.width = defaultPaddleWidth * 1.45;
+                paddle.isExpanded = true;
+
+                if (paddle.expandTimer) clearTimeout(paddle.expandTimer);
+                // 寬板持續 8 秒
+                paddle.expandTimer = setTimeout(() => {
+                    paddle.width = defaultPaddleWidth;
+                    paddle.isExpanded = false;
+                }, 8000);
+            } else if (type === 'MULTI') {
+                // 分裂新增一顆球
+                if (balls.length > 0) {
+                    let mainBall = balls[0];
+                    balls.push({
+                        x: mainBall.x,
+                        y: mainBall.y,
+                        radius: mainBall.radius,
+                        speed: mainBall.speed,
+                        dx: -mainBall.dx || 3,
+                        dy: mainBall.dy
+                    });
+                }
+            } else if (type === 'LIFE') {
+                lives++;
+                updateHUD();
+            }
+        }
+
+        // 主繪製迴圈
+        function render() {
+            drawGridBackground();
+            drawBricks();
+            drawPaddle();
+            drawBalls();
+            drawPowerUps();
+        }
+
+        // 遊戲動態主循環
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 初始化頁面並啟動繪製迴圈
+        window.onload = function() {
+            resetRound();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
